@@ -3,8 +3,7 @@ from aiogram.types import ContentType
 
 from data.config import ADMINS
 from keyboards.default import menu, admin_panel_buttons
-from loader import dp, bot
-from utils.create_certificate import create_certificate
+from loader import dp
 
 
 @dp.message_handler(state=None, content_types=ContentType.ANY, user_id=ADMINS)

@@ -17,7 +17,7 @@ from keyboards.inline import sciences_keyboards, classes_keyboards, tests_keyboa
 from keyboards.inline.test_solution import buy2_button, transfer_type_keyboards, transfer_success_keyboards, \
     update_permission_button, admin_check_test_cd, download_certificate_cd, certificate_download
 from loader import dp, db, bot
-from utils.create_certificate import create_certificate
+from utils.misc.certificate import write_to_certificate
 
 
 @dp.message_handler(IsPrivate(), text="🧑‍💻️ Test ishlash")
@@ -55,14 +55,9 @@ async def list_classes(call: CallbackQuery, state: FSMContext, science_id, **kwa
 
 
 async def list_tests(call: CallbackQuery, state: FSMContext, premium, science_id, class_id, **kwargs):
-    if premium:
-        info = "✍🏻 Testni yechish uchun testni tanlang!\n\n‼️ Eslatma.\n\n" \
-               "Sertifikat faqat 1-urinishda 85 balldan yuqori ball olgan foydalanuvchi uchun beriladi"
-    else:
-        info = "✍🏻 Testni yechish uchun testni tanlang!\n\n‼️ Eslatma.\n\n" \
-               "Sertifikat faqat pullik testlarni yechgan foydalanuvchilar uchun beriladi"
-    await call.message.edit_text(info,
-                                 reply_markup=await tests_keyboards(call.from_user.id, premium, science_id, class_id))
+    info = "✍🏻 Testni yechish uchun testni tanlang!\n\n‼️ Eslatma.\n\n" \
+           "Sertifikat faqat 1-urinishda 85 balldan yuqori ball olgan foydalanuvchi uchun beriladi"
+    await call.message.edit_text(info, reply_markup=await tests_keyboards(call.from_user.id, premium, science_id, class_id))
 
 
 async def check_confirm(call: CallbackQuery, state: FSMContext, premium, science_id, class_id, item_id, **kwargs):
@@ -364,37 +359,23 @@ async def check_responses_test(call: CallbackQuery, state: FSMContext):
         confirm_text += f"""\n        {blank}{quantity} - {"✅" if res[-1] == test[-1] else "❌"}"""
     if ball >= 85:
         if urinish == 0:
-            if premium:
-                confirm_text += "\n\nSizni sertifikat bilan tabriklaymiz 🥳️"
-                fullname = db.select_user(user_id=call.from_user.id)[1]
-                message = await call.message.answer(confirm_text)
-                photo = create_certificate(call.from_user.id, test_id, fullname, science, class_number,
-                                           now.date())
-                with open(photo, 'rb') as file:
-                    message_id = await bot.send_document('5232052738', document=file, caption='sertifikat')
-                    certificate = message_id.document.file_id
-                db.stop_progress_solvedtest(call.from_user.id, test_id, ball, certificate=certificate)
-                await message.edit_reply_markup(
-                                          reply_markup=await certificate_download(call.from_user.id, test_id))
-                try:
-                    os.remove(photo)
-                except OSError as xatolik:
-                    print(f"{photo} o'chirishda xatolik yuz berdi: {xatolik}")
-            else:
-                confirm_text += "\n\nSizni yuqori ball bilan tabriklayman 🥳️"
-                db.stop_progress_solvedtest(call.from_user.id, test_id, ball, certificate=None)
-                await call.message.answer(confirm_text)
+            confirm_text += "\n\nSizni sertifikat bilan tabriklaymiz 🥳️"
+            fullname = db.select_user(user_id=call.from_user.id)[1]
+            message = await call.message.answer(confirm_text)
+            photo = await write_to_certificate(fullname, class_number, science, call.from_user.id)
+            db.stop_progress_solvedtest(call.from_user.id, test_id, ball, certificate=photo)
+            await message.edit_reply_markup(reply_markup=await certificate_download(call.from_user.id, test_id))
+            try:
+                os.remove(f"data/images/{call.from_user.id}.jpg")
+            except OSError as xatolik:
+                pass
         else:
             confirm_text += "\n\nSizni yuqori ball bilan tabriklayman 🥳️"
             await call.message.answer(confirm_text)
     else:
         if urinish == 0:
-            if premium:
-                confirm_text += "\n\nSiz sertifikat ololmadingiz ❗️\nBoshqa testlarimizda o'zingizni sinab ko'ring!"
-                db.stop_progress_solvedtest(call.from_user.id, test_id, ball, certificate=None)
-            else:
-                confirm_text += "\n\nBoshqa testlarimizda o'zingizni sinab ko'ring!"
-                db.stop_progress_solvedtest(call.from_user.id, test_id, ball, certificate=None)
+            confirm_text += "\n\nSiz sertifikat ololmadingiz ❗️\nBoshqa testlarimizda o'zingizni sinab ko'ring!"
+            db.stop_progress_solvedtest(call.from_user.id, test_id, ball, certificate=None)
         else:
             confirm_text += "\n\nBoshqa testlarimizda o'zingizni sinab ko'ring!"
         await call.message.answer(confirm_text)
